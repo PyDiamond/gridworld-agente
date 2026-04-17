@@ -50,7 +50,6 @@ class MiAgente(Agente):
         # Atributos inicializados para memoria y contadores
         self.visited = set()
         self.pasos = 0
-        # Puedes agregar más campos si los necesitas (p. ej. self.memoria = {})
 
     def al_iniciar(self):
         """Se llama una vez al iniciar la simulación. Opcional."""
@@ -67,19 +66,23 @@ class MiAgente(Agente):
         Retorna:
             'arriba', 'abajo', 'izquierda' o 'derecha'
         """
-        # Inicializar memoria si hace falta
+        # Inicializar estructuras de memoria del agente si aún no existen
         if not hasattr(self, 'visited'):
-            # visited: mapa pos -> último paso visitado (int)
+            #posición → último paso en que fue visitada
             self.visited = {}
         elif isinstance(self.visited, set):
-            # convertir la representación antigua (set) a dict con timestamp 0
+            # convertir estructura antigua (set) a diccionario con marca inicial
             self.visited = {p: 0 for p in self.visited}
+
+        # Contador de pasos realizados por el agente
         if not hasattr(self, 'pasos'):
             self.pasos = 0
+        
+        # Última posición visitada, con la finalidad de evitar retrocesos innecesarios
         if not hasattr(self, 'last_pos'):
             self.last_pos = None
 
-        # Helpers
+        # Función auxliar para calcular la siguiente posición
         def siguiente_pos(p, d):
             r, c = p
             if d == 'arriba':
@@ -108,7 +111,7 @@ class MiAgente(Agente):
                 self.last_pos = pos
                 return d
 
-        # 2) Intentar seguir la brújula (vertical primero, luego horizontal)
+        # 2) Seguir la dirección sugerida hacia la meta (heurística tipo brújula)
         direccion_meta = percepcion.get('direccion_meta')
         if direccion_meta:
             for d in direccion_meta:
@@ -117,12 +120,12 @@ class MiAgente(Agente):
                 val = percepcion.get(d)
                 if val in ('libre', 'meta'):
                     nxt = siguiente_pos(pos, d)
-                    # evitar retroceder al paso inmediatamente anterior si hay alternativa
+                    # evitar retroceder unmediatamente a la posición anterior
                     if nxt != prev:
                         self.last_pos = pos
                         return d
 
-        # 3) Buscar movimientos libres que lleven a celdas no visitadas (preferidos)
+        # 3) Evaluar movimientos posibles: priorizar celdas no visitadas para exploración
         candidatos_no_visitados = []
         candidatos_visitados = []
         for d in acciones:
@@ -132,10 +135,12 @@ class MiAgente(Agente):
                     # no priorizamos volver inmediatamente atrás
                     candidatos_visitados.append((d, self.visited.get(nxt, 0)))
                     continue
+
+                # Si la celda no ha sido visitada, se prioriza como opción de exploración
                 if nxt not in self.visited:
                     candidatos_no_visitados.append(d)
                 else:
-                    candidatos_visitados.append((d, self.visited.get(nxt, 0)))
+                    candidatos_visitados.append((d, self.visited.get(nxt, 0))) # Si ya fue visitada, se guarda junto con su "antiguedad"
 
         if candidatos_no_visitados:
             # elegir la primera no visitada (heurística simple, mantiene orden estable)
@@ -149,7 +154,7 @@ class MiAgente(Agente):
             self.last_pos = pos
             return candidatos_visitados[0][0]
 
-        # 5) Como último recurso, intentar cualquier movimiento libre (incluye retroceder)
+        # 5) Como último recurso, intentar cualquier movimiento libre (incluyendo retroceder)
         for d in acciones:
             if percepcion.get(d) == 'libre':
                 self.last_pos = pos
